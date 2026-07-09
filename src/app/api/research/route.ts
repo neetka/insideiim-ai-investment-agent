@@ -78,6 +78,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       recommendation: output.recommendation,
+      financials: output.financials || null,
+      webResearch: output.webResearch || "",
+      newsResearch: output.newsResearch || "",
       logs: output.logs || [],
     });
   } catch (error: any) {
