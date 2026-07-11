@@ -25,7 +25,7 @@ export function getChatModel(temperature = 0.2) {
   }
   return new ChatGoogleGenerativeAI({
     apiKey: env.GEMINI_API_KEY,
-    model: "gemini-2.5-flash", // Fast, accurate and modern model in 2026
+    model: "gemini-3.5-flash", // Fast, accurate and widely available model
     temperature,
   });
 }

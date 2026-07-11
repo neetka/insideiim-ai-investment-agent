@@ -73,10 +73,9 @@ Please write a concise quantitative assessment (150-250 words) evaluating the co
     return {
       financials,
       logs,
-      webResearch: state.webResearch || "",
-      newsResearch: state.newsResearch || "",
     };
   } catch (error: any) {
+    console.error(`[Analyst] Detailed error for ${ticker}:`, error);
     logs.push(`[Analyst] Error during financial analysis: ${error.message || error}`);
     return {
       logs,
@@ -138,6 +137,7 @@ Summarize the key recent news events (e.g., earnings releases, regulatory action
       logs,
     };
   } catch (error: any) {
+    console.error(`[Researcher] Detailed error for ${ticker}:`, error);
     logs.push(`[Researcher] Error during qualitative research: ${error.message || error}`);
     return {
       logs,
@@ -155,8 +155,8 @@ export async function deciderNode(state: ResearchState) {
   logs.push(`[Decider] Synthesizing all research inputs to generate final investment recommendation...`);
 
   if (!financials) {
-    logs.push(`[Decider] Aborting: Quantitative financials are missing. Check previous steps.`);
-    throw new Error("Cannot formulate recommendation without financial data.");
+    logs.push(`[Decider] Warning: Quantitative financials are missing. Attempting recommendation with available data only.`);
+    console.error(`[Decider] financials is missing for ${ticker}. webResearch length: ${webResearch?.length || 0}, newsResearch length: ${newsResearch?.length || 0}`);
   }
 
   try {
@@ -169,32 +169,32 @@ export async function deciderNode(state: ResearchState) {
 
     const prompt = `
 You are the Investment Committee Chair at a premier global hedge fund.
-You must synthesize all provided research inputs and formulate a final, definitive investment recommendation (BUY, HOLD, or SELL) for ${ticker} (${financials.name}).
+You must synthesize all provided research inputs and formulate a final, definitive investment recommendation (BUY, HOLD, or SELL) for ${ticker}${financials?.name ? ` (${financials.name})` : ""}.
 
 User Profile and Context:
 - Investment Horizon: ${horizon.toUpperCase()} term (Short-term: <1yr, Medium-term: 1-3yrs, Long-term: >3yrs)
 - Risk Tolerance Profile: ${riskProfile.toUpperCase()} (Low: capital preservation, Medium: balanced growth, High: aggressive growth/high volatility tolerated)
 
 Quantitative Financial Data & Analyst Assessment:
-Current Price: $${financials.price}
+${financials ? `Current Price: $${financials.price}
 Market Cap: ${financials.marketCap ? `$${(financials.marketCap / 1e9).toFixed(2)}B` : "N/A"}
 PE Ratio: ${financials.peRatio || "N/A"}
 EPS: ${financials.eps || "N/A"}
 
 Qualitative Financial Analysis:
-${financials.financials ? JSON.stringify(financials.financials) : "N/A"}
+${financials.financials ? JSON.stringify(financials.financials) : "N/A"}` : "Financial data was unavailable. Base your analysis on the qualitative research below."}
 
 Web Research Summary (Competition & Market Dynamics):
-${webResearch}
+${webResearch || "No web research available."}
 
 Recent News & Sentiment Summary:
-${newsResearch}
+${newsResearch || "No recent news available."}
 
 Requirements:
 1. Provide a clear, definitive BUY, HOLD, or SELL rating.
 2. Consider the user's investment horizon and risk profile in your decision. For instance, a highly volatile high-growth stock may be a BUY for a High risk tolerance and Long horizon, but a HOLD or SELL for a Low risk tolerance and Short horizon.
 3. Formulate an institutional-grade investment thesis that connects the financial metrics, competition, and recent news.
-4. Set a realistic target price if appropriate (or state "N/A" if not applicable).
+4. Set a realistic target price if appropriate (or state "N/A" if not applicable).${!financials ? ` Since financial data is unavailable, use currentPrice: 0 in your response.` : ""}
 5. Specify key pros (upside triggers), cons (headwinds), risks (events that could break the thesis), and catalysts (upcoming events like earnings, product launches, FDA approvals, etc.).
 `;
 

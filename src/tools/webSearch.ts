@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { validateEnv } from "../lib/env";
 
-
 export interface SearchResult {
   title: string;
   url: string;

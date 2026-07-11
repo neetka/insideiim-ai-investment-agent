@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 
-
+const yahooFinance = new YahooFinance();
 
 export interface FinancialMetrics {
   ticker: string;
@@ -53,20 +53,34 @@ export async function getFinancialData(ticker: string): Promise<FinancialMetrics
   const cleanTicker = ticker.trim().toUpperCase();
 
   try {
-    // 1. Fetch Quote Data
-    const quote = (await yahooFinance.quote(cleanTicker)) as any;
-    if (!quote) {
-      throw new Error(`Ticker ${cleanTicker} not found or no quote data available.`);
+    // 1. Resolve Ticker (handles cases where user inputs company name like "NVIDIA")
+    let actualTicker = cleanTicker;
+    try {
+      const searchResult = await yahooFinance.search(cleanTicker);
+      if (searchResult.quotes && searchResult.quotes.length > 0) {
+        // Find the first equity quote
+        const equity = searchResult.quotes.find(q => q.quoteType === "EQUITY") || searchResult.quotes[0];
+        if (equity && equity.symbol) {
+          actualTicker = equity.symbol as string;
+        }
+      }
+    } catch (e) {
+      console.warn(`Search failed for ${cleanTicker}, falling back to direct quote.`);
     }
 
+    // 2. Fetch Quote Data
+    const quote = (await yahooFinance.quote(actualTicker)) as any;
+    if (!quote) {
+      throw new Error(`Ticker ${actualTicker} not found or no quote data available.`);
+    }
     // 2. Fetch Quote Summary Modules
     let summary: any = {};
     try {
-      summary = await yahooFinance.quoteSummary(cleanTicker, {
+      summary = await yahooFinance.quoteSummary(actualTicker, {
         modules: ["assetProfile", "financialData", "defaultKeyStatistics", "recommendationTrend"],
       });
     } catch (err) {
-      console.warn(`Could not fetch quote summary modules for ${cleanTicker}:`, err);
+      console.warn(`Could not fetch quote summary modules for ${actualTicker}:`, err);
     }
 
     // 3. Fetch Historical Data (Last 30 days)
@@ -76,7 +90,7 @@ export async function getFinancialData(ticker: string): Promise<FinancialMetrics
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(today.getDate() - 45); // fetch 45 days to ensure 30 trading days
 
-      const historyResult = await yahooFinance.historical(cleanTicker, {
+      const historyResult = await yahooFinance.historical(actualTicker, {
         period1: thirtyDaysAgo.toISOString().split("T")[0],
         period2: today.toISOString().split("T")[0],
         interval: "1d",
@@ -89,7 +103,7 @@ export async function getFinancialData(ticker: string): Promise<FinancialMetrics
         }));
       }
     } catch (err) {
-      console.warn(`Could not fetch historical data for ${cleanTicker}:`, err);
+      console.warn(`Could not fetch historical data for ${actualTicker}:`, err);
     }
 
     // Extract modules safely
@@ -105,8 +119,8 @@ export async function getFinancialData(ticker: string): Promise<FinancialMetrics
     };
 
     return {
-      ticker: cleanTicker,
-      name: quote.longName || quote.shortName || cleanTicker,
+      ticker: actualTicker,
+      name: quote.longName || quote.shortName || actualTicker,
       sector: profile.sector,
       industry: profile.industry,
       description: profile.longBusinessSummary,
